@@ -1,21 +1,86 @@
 const SHEET_BASE = "https://sheets.livepolls.app/api/spreadsheets/a38d476f-d0b4-4200-b29c-1ad937b58868";
+let currentUser = null;
 
 function apiGet(sheet) {
   return fetch(`${SHEET_BASE}/${sheet}`)
     .then(res => res.json());
 }
 
+function apiPost(sheet, data) {
+  return fetch(`${SHEET_BASE}/${sheet}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify([data])
+  });
+}
+
+function apiPut(sheet, rowId, data) {
+  return fetch(`${SHEET_BASE}/${sheet}/${rowId}`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+}
+
+function loginOrSignup() {
+  const username = document.getElementById("username").value.trim();
+  const password = document.getElementById("password").value.trim();
+  if (!username || !password) return alert("Enter both fields");
+
+  apiGet("users").then(users => {
+    const user = users.find(u => u.username === username);
+    if (user) {
+      if (user.password !== password) return alert("Wrong password");
+      currentUser = user;
+      renderHome();
+    } else {
+      const newUser = {
+        username,
+        "display name": username,
+        password,
+        votes: "[]",
+        friends: "[]",
+        sharing: "Share votes to friends",
+        notify: "true"
+      };
+      apiPost("users", newUser).then(() => {
+        currentUser = newUser;
+        renderHome();
+      });
+    }
+  });
+}
+
 function renderHome() {
   const app = document.getElementById("app");
-  if (!app) return;
+  if (!app || !currentUser) return;
   apiGet("debates").then(debates => {
-    app.innerHTML = debates.map(d => `
-      <div class="card">
-        <h2>${d.question}</h2>
-        <p>${d.description || ""}</p>
-      </div>
-    `).join("");
+    app.innerHTML = `<h2>Welcome, ${currentUser.username}</h2>` + debates.map(d => {
+      const options = d.options?.split(',').map(o => `<button onclick="castVote('${d["debate id"]}', '${o.trim()}')">${o.trim()}</button>`).join(" ") || "";
+      return `
+        <div class="card">
+          <h3>${d.question}</h3>
+          <p>${d.description || ""}</p>
+          <div>${options}</div>
+        </div>
+      `;
+    }).join("");
   });
+}
+
+function castVote(debateId, option) {
+  const votes = JSON.parse(currentUser.votes || "[]");
+  const timestamp = Date.now();
+  const existing = votes.find(v => v.debateId === debateId);
+  if (existing) {
+    existing.option = option;
+    existing.timestamp = timestamp;
+  } else {
+    votes.push({ debateId, option, timestamp });
+  }
+  currentUser.votes = JSON.stringify(votes);
+  apiPut("users", currentUser.rowNumber, { votes: currentUser.votes });
+  alert("Vote submitted!");
 }
 
 function switchTab(tab) {
@@ -52,12 +117,11 @@ function switchTab(tab) {
   }
 }
 
-// Auto-run home if index.html
-if (location.pathname.endsWith("index.html") || location.pathname === "/") {
+// Auto-load home if already logged in
+if ((location.pathname.endsWith("index.html") || location.pathname === "/") && currentUser) {
   renderHome();
 }
 
-// Auto-load questions by default on activity.html
 if (location.pathname.endsWith("activity.html")) {
   switchTab("questions");
 } 
