@@ -1,144 +1,198 @@
-const SHEET_BASE = "https://sheets.livepolls.app/api/spreadsheets/a38d476f-d0b4-4200-b29c-1ad937b58868";
-let currentUser = JSON.parse(localStorage.getItem("stilt:user")||"null");
-let currentRow = null;
+/* ------------- CONFIG ------------- */
+const SHEET_BASE =
+  "https://sheets.livepolls.app/api/spreadsheets/a38d476f-d0b4-4200-b29c-1ad937b58868";
+const USERS    = `${SHEET_BASE}/users`;
+const DEBATES  = `${SHEET_BASE}/debates`;
+const REQUESTS = `${SHEET_BASE}/requests`;
 
-/* ---------------- API helpers ---------------- */
-const apiGet  = sheet => fetch(`${SHEET_BASE}/${sheet}`).then(r=>r.json());
-const apiPost = (sheet,data)=>fetch(`${SHEET_BASE}/${sheet}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify([data])});
-const apiPut  = (sheet,row,data)=>fetch(`${SHEET_BASE}/${sheet}/${row}`,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(data)});
-const uuid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2);
+/* ------------- GLOBAL STATE ------------- */
+let currentUser = JSON.parse(localStorage.getItem("stilt:user") || "null");
 
-/* ---------------- Auth ---------------- */
-function loginOrSignup(){
-  const username=document.getElementById('username').value.trim();
-  const password=document.getElementById('password').value.trim();
-  if(!username||!password)return alert('Enter both fields');
-  apiGet('users').then(users=>{
-    const idx=users.findIndex(u=>u.username===username);
-    if(idx>-1){
-      const user=users[idx];
-      if(user.password!==password)return alert('Wrong password');
-      currentUser=user;currentRow=(user.__rowNum||idx+2);
-      saveSession();
-      route();
-    }else{
-      const newUser={
-        "user id":uuid(),username,"display name":username,password,votes:"[]",friends:"[]",sharing:"Share votes to friends",notify:"true"};
-      apiPost('users',newUser).then(()=>apiGet('users')).then(u=>{
-        const row=u.find(r=>r.username===username);
-        currentUser=row;currentRow=(row.__rowNum||u.indexOf(row)+2);
-        saveSession();route();
-      });
-    }
+/* ------------- HELPERS ------------- */
+const j = JSON.stringify;
+const h = (p) => document.querySelector(p);
+const post  = (url,data) => fetch(url,{method:"POST",headers:{'content-type':'application/json'},body:j([data])}).then(r=>r.json());
+const put   = (url,data) => fetch(url,{method:"PUT",headers:{'content-type':'application/json'},body:j(data)}).then(r=>r.json());
+const get   = (url)      => fetch(url).then(r=>r.json());
+
+function genId() { return Date.now().toString(36); }
+
+/* ------------- AUTH ------------- */
+async function signUp(e){
+  e.preventDefault();
+  const f   = new FormData(e.target);
+  const all = await get(USERS);               // ensure unique username
+  if (all.find(u=>u.username===f.get("username")))
+    return alert("Username taken");
+  const id  = genId();
+  const user = {
+    "user id": id,
+    username : f.get("username"),
+    "display name": f.get("display"),
+    password : btoa(f.get("password")),       // super‑light “hash”
+    votes    : "[]",
+    "ai summary": "",
+    friends  : "[]",
+    sharing  : "everyone",
+    notify   : "true"
+  };
+  await post(USERS,user);
+  currentUser = user;
+  localStorage.setItem("stilt:user",j(user));
+  location.reload();
+}
+
+async function logIn(e){
+  e.preventDefault();
+  const f   = new FormData(e.target);
+  const all = await get(USERS);
+  const u   = all.find(u=>u.username===f.get("username") && atob(u.password)===f.get("password"));
+  if(!u) return alert("Invalid credentials");
+  currentUser = u;
+  localStorage.setItem("stilt:user",j(u));
+  location.reload();
+}
+
+function logOut(){
+  localStorage.removeItem("stilt:user");
+  currentUser=null; location.reload();
+}
+
+/* ------------- UI SETUP ------------- */
+function byId(id){return document.getElementById(id);}
+function initUI(){
+  const navAuth = byId("nav-auth"), navUser = byId("nav-user");
+  if(currentUser){
+    navAuth.classList.add("hidden");
+    navUser.classList.remove("hidden");
+    byId("welcome").textContent = `Hi, ${currentUser["display name"]}!`;
+    /* settings defaults */
+    byId("form-settings").sharing.value = currentUser.sharing||"everyone";
+    byId("form-settings").notify.checked= currentUser.notify!=="false";
+  }else{
+    navAuth.classList.remove("hidden");
+    navUser.classList.add("hidden");
+  }
+  /* toggle screens */
+  const show = id=>{
+    ["screen-login","screen-signup"].forEach(x=>byId(x)?.classList.toggle("hidden",x!==id));
+  };
+  byId("btn-login-view") .onclick=()=>show("screen-login");
+  byId("btn-signup-view").onclick=()=>show("screen-signup");
+  byId("btn-logout")?.addEventListener("click",logOut);
+  if(currentUser) byId("app").classList.remove("hidden");
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+  initUI();
+  /* bind forms */
+  byId("form-signup")?.addEventListener("submit",signUp);
+  byId("form-login") ?.addEventListener("submit",logIn);
+  byId("form-debate")?.addEventListener("submit",createDebate);
+  byId("form-settings")?.addEventListener("submit",saveSettings);
+  loadDebates();
+});
+
+/* ------------- DEBATES + VOTING ------------- */
+async function createDebate(e){
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const debate = {
+    "debate id": genId(),
+    question   : f.get("question"),
+    description: f.get("description"),
+    options    : j(f.get("options").split(",").map(x=>x.trim())),
+    category   : f.get("category"),
+    topic      : f.get("topic")
+  };
+  await post(DEBATES,debate);
+  e.target.reset();
+  loadDebates();
+}
+
+/* render list */
+async function loadDebates(){
+  if(!currentUser) return;
+  const list = byId("debate-list");
+  list.innerHTML="";
+  const debates = await get(DEBATES);
+  debates.forEach(d=>{
+    const li=document.createElement("li");
+    li.innerHTML=`
+      <strong>${d.question}</strong><br/>
+      ${d.description||""}<br/>
+      ${JSON.parse(d.options).map(o=>`
+        <label><input type="radio" name="v-${d["debate id"]}" value="${o}"/>${o}</label>
+      `).join(" ")}
+      <button data-id="${d["debate id"]}">Vote</button>`;
+    li.querySelector("button").onclick=voteHandler;
+    list.appendChild(li);
   });
 }
-function saveSession(){localStorage.setItem('stilt:user',JSON.stringify(currentUser));}
-function logout(){localStorage.removeItem('stilt:user');currentUser=null;location.hash='home';route();}
 
-/* ---------------- Routing ---------------- */
-window.addEventListener('hashchange',route);
-function route(){if(!currentUser){renderAuth();return;}const page=location.hash.slice(1)||'home';
-  if(page==='profile')renderProfile();
-  else if(page==='settings')renderSettings();
-  else renderHome();}
-
-document.addEventListener('DOMContentLoaded',()=>{if(location.pathname.endsWith('activity.html')){switchTab('questions');}else{route();}});
-
-/* ---------------- Renderers ---------------- */
-function renderAuth(){document.getElementById('app').innerHTML=`<div id="auth"><h2>Login or Signup</h2><input id="username" placeholder="Username"><input id="password" type="password" placeholder="Password"><button onclick="loginOrSignup()">Go</button></div>`;}
-
-function renderHome(){const app=document.getElementById('app');
-  apiGet('debates').then(debates=>{
-    apiGet('users').then(users=>{
-      const others=users.filter(u=>u.username!==currentUser.username);
-      const friendSet=new Set(JSON.parse(currentUser.friends||'[]'));
-      const pendingToMe=[];const sentByMe=[];
-      apiGet('requests').then(reqs=>{
-        reqs.forEach(r=>{if(r.to_username===currentUser.username&&r.status==='pending')pendingToMe.push(r);if(r.from_username===currentUser.username&&r.status==='pending')sentByMe.push(r);});
-        app.innerHTML=`<h2>Welcome, ${currentUser.username}</h2>
-          <button onclick="logout()">Logout</button>
-          <h3>Debates</h3>`+
-          debates.map(d=>renderDebateCard(d)).join('')+
-          `<h3>Users</h3>`+
-          others.map(u=>renderUserCard(u,friendSet,pendingToMe,sentByMe)).join('');
-      });
-    });
-  });}
-
-function renderDebateCard(d){const opts=d.options?.split(',').map(o=>o.trim())||[];
-  const userVotes=JSON.parse(currentUser.votes||'[]');
-  const myVote=userVotes.find(v=>v.debateId===d["debate id"]);
-  return `<div class="card"><h4>${d.question}</h4><p>${d.description||''}</p>${opts.map(o=>`<button onclick="castVote('${d["debate id"]}','${o}')">${o}</button>`).join(' ')}${myVote?`<p class='friend-status'>You voted: ${myVote.option}</p>`:''}</div>`;}
-
-function renderUserCard(u,friendSet,pendingToMe,sentByMe){
-  const isFriend=friendSet.has(u.username);
-  const pending=pendingToMe.find(r=>r.from_username===u.username)||sentByMe.find(r=>r.to_username===u.username);
-  let action='';
-  if(isFriend)action='<span class="friend-status">Friend✓</span>';
-  else if(pending&&pending.from_username===currentUser.username)action='<span class="friend-status">Request Sent</span>';
-  else if(pending)action=`<button onclick="acceptFriend('${pending.__rowNum||pending.rowIndex||''}','${u.username}')">Accept</button>`;
-  else action=`<button onclick="sendFriendRequest('${u.username}')">Add Friend</button>`;
-  return `<div class="card"><strong>${u["display name"]||u.username}</strong>${action}</div>`;}
-
-function renderProfile(){const app=document.getElementById('app');
-  const votes=JSON.parse(currentUser.votes||'[]').sort((a,b)=>(b.timestamp||0)-(a.timestamp||0));
-  apiGet('debates').then(debates=>{
-    const map=Object.fromEntries(debates.map(d=>[d["debate id"],d.question]));
-    app.innerHTML=`<h2>Your Profile</h2><button onclick="location.hash='home'">Back</button><h3>Votes</h3>`+
-      (votes.length?`<ul>${votes.map(v=>`<li>${map[v.debateId]||v.debateId}: ${v.option}</li>`).join('')}</ul>`:'<p>No votes yet.</p>');
-  });}
-
-function renderSettings(){const app=document.getElementById('app');
-  app.innerHTML=`<h2>Settings</h2><button onclick="location.hash='home'">Back</button><label>Sharing<select id='shareSel'><option>Share votes to everyone</option><option>Share votes to friends</option><option>Don't share votes</option></select></label><label><input type='checkbox' id='notifyChk'> Notify on friends votes</label><button onclick='saveSettings()'>Save</button>`;
-  document.getElementById('shareSel').value=currentUser.sharing;
-  document.getElementById('notifyChk').checked=currentUser.notify!=='false';}
-function saveSettings(){currentUser.sharing=document.getElementById('shareSel').value;currentUser.notify=document.getElementById('notifyChk').checked?'true':'false';apiPut('users',currentRow,{sharing:currentUser.sharing,notify:currentUser.notify});saveSession();alert('Saved');location.hash='home';}
-
-/* ---------------- Votes ---------------- */
-function castVote(debateId,option){const votes=JSON.parse(currentUser.votes||'[]');const timestamp=Date.now();const existing=votes.find(v=>v.debateId===debateId);if(existing){existing.option=option;existing.timestamp=timestamp;}else{votes.push({debateId,option,timestamp});}currentUser.votes=JSON.stringify(votes);apiPut('users',currentRow,{votes:currentUser.votes});saveSession();route();}
-
-/* ---------------- Friend requests ---------------- */
-function sendFriendRequest(to){apiPost('requests',{from_username:currentUser.username,to_username:to,status:'pending',timestamp:Date.now()}).then(()=>route());}
-function acceptFriend(rowId,fromUser){const friends=JSON.parse(currentUser.friends||'[]');friends.push(fromUser);currentUser.friends=JSON.stringify(friends);apiPut('users',currentRow,{friends:currentUser.friends});
-  // update other user
-  apiGet('users').then(users=>{const other=users.find(u=>u.username===fromUser);if(other){const otherRow=(other.__rowNum||users.indexOf(other)+2);const ofriends=JSON.parse(other.friends||'[]');ofriends.push(currentUser.username);apiPut('users',otherRow,{friends:JSON.stringify(ofriends)});}apiPut('requests',rowId,{status:'accepted'}).then(()=>route());});}
-
-/* ---------------- Activity page ---------------- */
-function switchTab(tab){
-  const container = document.getElementById('activity-content');
-  if (!container) return;
-
-  if (tab === 'questions') {
-    apiGet('debates').then(debates => {
-      container.innerHTML = debates.map(d =>
-        `<div class='card'><h3>${d.question}</h3><p>${d.description || ''}</p></div>`
-      ).join('');
-    });
-  } else {
-    Promise.all([apiGet('users'), apiGet('debates')]).then(([users, debates]) => {
-      const map = Object.fromEntries(debates.map(d => [d['debate id'], d.question]));
-      const friends = JSON.parse(currentUser.friends || '[]');
-
-      const visibleUsers = users.filter(u =>
-        friends.includes(u.username) && u.sharing !== "Don't share votes"
-      );
-
-      const html = visibleUsers.map(u => {
-        const votes = JSON.parse(u.votes || '[]').sort((a, b) =>
-          (b.timestamp || 0) - (a.timestamp || 0)
-        );
-        if (!votes.length) return '';
-        return `<div class='card'><h4>${u['display name']}</h4><ul>${
-          votes.slice(0, 5).map(v =>
-            `<li>${map[v.debateId] || v.debateId}: ${v.option}</li>`
-          ).join('')
-        }</ul></div>`;
-      }).filter(Boolean).join('');
-
-      container.innerHTML = html || '<p>No friend votes.</p>';
-    });
-  }
+async function voteHandler(e){
+  const debateId = e.target.dataset.id;
+  const radio = document.querySelector(`input[name="v-${debateId}"]:checked`);
+  if(!radio) return alert("Pick an option");
+  const choice = radio.value;
+  /* update local user votes JSON */
+  const votes = JSON.parse(currentUser.votes||"[]");
+  const existing = votes.find(v=>v.id===debateId);
+  const now = new Date().toISOString();
+  if(existing){ existing.choice=choice; existing.time=now; }
+  else         votes.push({id:debateId,choice,time:now});
+  currentUser.votes = j(votes);
+  await put(`${USERS}/${currentUser["user id"]}`, currentUser);
+  localStorage.setItem("stilt:user",j(currentUser));
+  alert("Vote saved!");
 }
 
+/* ------------- SETTINGS ------------- */
+function saveSettings(e){
+  e.preventDefault();
+  const f = new FormData(e.target);
+  currentUser.sharing = f.get("sharing");
+  currentUser.notify  = f.get("notify") ? "true":"false";
+  put(`${USERS}/${currentUser["user id"]}`,currentUser);
+  localStorage.setItem("stilt:user",j(currentUser));
+  e.target.closest("dialog").close();
+}
 
-/* Ensure logout link visible? not needed here */
+byId("btn-settings")?.addEventListener("click",()=>byId("dlg-settings").showModal());
+
+/* ------------- ACTIVITY PAGE ------------- */
+async function initActivity(){
+  if(!currentUser){ return location.href="index.html"; }
+  const qTab = byId("tab-questions"), fTab = byId("tab-friends");
+  const qs   = byId("list-questions"), fs = byId("list-friends");
+  qTab.onclick = ()=>{swap(qTab,fTab,qs,fs);};
+  fTab.onclick = ()=>{swap(fTab,qTab,fs,qs);};
+  function swap(a,b,x,y){a.classList.add("active");b.classList.remove("active");x.classList.remove("hidden");y.classList.add("hidden");}
+  /* initial load + polling */
+  await loadActivity(qs,fs);
+  setInterval(()=>loadActivity(qs,fs),30_000);
+}
+
+async function loadActivity(qsEl,fsEl){
+  const [debates, users] = await Promise.all([get(DEBATES), get(USERS)]);
+  /* new questions list */
+  qsEl.innerHTML = debates.slice(-25).reverse().map(d=>`
+      <li><strong>${d.question}</strong> – ${new Date(parseInt(d["debate id"],36)).toLocaleString()}</li>
+  `).join("");
+
+  /* friends' votes list */
+  const friends = JSON.parse(currentUser.friends||"[]");
+  fsEl.innerHTML = "";
+  if(currentUser.notify==="false"){ fsEl.innerHTML="<em>Notifications off</em>"; return; }
+  users.filter(u=>friends.includes(u["user id"]) && u.sharing!=="none").forEach(f=>{
+      JSON.parse(f.votes||"[]").forEach(v=>{
+        const debate = debates.find(d=>d["debate id"]===v.id);
+        if(!debate) return;
+        if(f.sharing==="friends" || f.sharing==="everyone"){
+          const li=document.createElement("li");
+          li.innerHTML=`<strong>${f["display name"]}</strong> voted <em>${v.choice}</em> on “${debate.question}” <small>${new Date(v.time).toLocaleString()}</small>`;
+          fsEl.appendChild(li);
+        }
+      });
+  });
+}
