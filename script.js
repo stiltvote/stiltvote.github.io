@@ -13,7 +13,12 @@ const j = JSON.stringify;
 const h = (p) => document.querySelector(p);
 const post  = (url,data) => fetch(url,{method:"POST",headers:{'content-type':'application/json'},body:j([data])}).then(r=>r.json());
 const put   = (url,data) => fetch(url,{method:"PUT",headers:{'content-type':'application/json'},body:j(data)}).then(r=>r.json());
-const get   = (url)      => fetch(url).then(r=>r.json());
+const get = async (url) => {
+  const res = await fetch(url);
+  const json = await res.json();
+  return Array.isArray(json) ? json : json.data;
+};
+
 
 function genId() { return Date.now().toString(36); }
 
