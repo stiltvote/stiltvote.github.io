@@ -1,13 +1,168 @@
-/* Tiny, readable default */
-body{font-family:system-ui, sans-serif;margin:0;line-height:1.4;background:#f8f9fa;color:#222}
-header{background:#fff;padding:1rem;border-bottom:1px solid #ddd;display:flex;gap:1rem;align-items:center}
-h1{margin:0;font-size:1.4rem}
-nav button,nav a{margin-right:0.5rem}
-.panel{background:#fff;margin:1rem;padding:1rem;border:1px solid #ddd;border-radius:0.5rem}
-.hidden{display:none}
-ul{list-style:none;padding:0}
-li{margin:0.5rem 0;padding:0.5rem;background:#eee;border-radius:0.5rem}
-button{cursor:pointer}
-.toggle{display:flex;gap:0.5rem;margin:1rem}
-.toggle button.active{background:#0069d9;color:#fff}
-dialog{border:none;border-radius:0.5rem;padding:1rem}
+/* Fancy, animated, modern UI */
+
+:root {
+  --bg: #f4f7fa;
+  --text: #1e1e1e;
+  --card: #ffffff;
+  --accent: #6366f1;
+  --border: #e2e8f0;
+  --radius: 1rem;
+  --shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+  --font: 'Segoe UI', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+}
+
+body {
+  font-family: var(--font);
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+}
+
+header {
+  background: var(--card);
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.8rem;
+  color: var(--accent);
+  letter-spacing: -0.5px;
+}
+
+nav button,
+nav a {
+  background: none;
+  border: none;
+  font-size: 1rem;
+  margin-left: 1rem;
+  cursor: pointer;
+  color: var(--text);
+  transition: color 0.3s;
+}
+
+nav button:hover,
+nav a:hover {
+  color: var(--accent);
+}
+
+main, .panel {
+  max-width: 720px;
+  margin: 2rem auto;
+  background: var(--card);
+  padding: 2rem;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+form input,
+form textarea,
+form select,
+form button {
+  display: block;
+  width: 100%;
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  font-size: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+}
+
+form button {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+form button:hover {
+  background: #4f46e5;
+}
+
+ul {
+  list-style: none;
+  padding: 0;
+}
+
+li {
+  background: #f9fafb;
+  margin: 1rem 0;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  box-shadow: var(--shadow);
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+li strong {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 1.1rem;
+  color: var(--accent);
+}
+
+button {
+  transition: background 0.3s ease;
+}
+
+.toggle {
+  max-width: 720px;
+  margin: 2rem auto;
+  display: flex;
+  background: var(--card);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.toggle button {
+  flex: 1;
+  padding: 1rem;
+  border: none;
+  font-size: 1rem;
+  background: none;
+  cursor: pointer;
+  color: var(--text);
+  transition: all 0.3s ease;
+}
+
+.toggle button.active {
+  background: var(--accent);
+  color: white;
+  font-weight: bold;
+}
+
+dialog {
+  border: none;
+  border-radius: var(--radius);
+  padding: 2rem;
+  box-shadow: var(--shadow);
+  width: 90%;
+  max-width: 400px;
+  background: var(--card);
+  animation: fadeIn 0.3s ease-out;
+}
+
+.hidden {
+  display: none;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
