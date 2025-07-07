@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Profile</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="panel">
+    <h2 id="profile-name">Loading...</h2>
+    <p id="profile-meta"></p>
+    <h3>Votes</h3>
+    <ul id="profile-votes"></ul>
+    <h3>Friends</h3>
+    <ul id="profile-friends"></ul>
+    <p><a href="index.html">← Back</a></p>
+  </main>
+  <script>
+    const SHEET_BASE = "https://sheets.livepolls.app/api/spreadsheets/a38d476f-d0b4-4200-b29c-1ad937b58868";
+    const USERS = `${SHEET_BASE}/users`;
+    const DEBATES = `${SHEET_BASE}/debates`;
+
+    const get = async url => {
+      const r = await fetch(url);
+      const j = await r.json();
+      return Array.isArray(j) ? j : j.data;
+    };
+    const j = JSON.stringify;
+    const safeJSON = (x, f=[]) => { try { return JSON.parse(x); } catch { return f; } };
+
+    const currentUser = JSON.parse(localStorage.getItem("stilt:user") || "null");
+    if (!currentUser) location.href = "index.html";
+
+    const params = new URLSearchParams(location.search);
+    const userId = params.get("id") || currentUser["user id"];
+
+    async function loadProfile() {
+      const [users, debates] = await Promise.all([get(USERS), get(DEBATES)]);
+      const user = users.find(u => u["user id"] === userId);
+      if (!user) return document.body.innerHTML = "<p>User not found</p>";
+
+      document.getElementById("profile-name").textContent = user["display name"] + (userId === currentUser["user id"] ? " (you)" : "");
+      document.getElementById("profile-meta").textContent = `@${user.username} – Sharing: ${user.sharing}`;
+
+      // Friends
+      const friendIds = safeJSON(user.friends);
+      const friendNames = users.filter(u => friendIds.includes(u["user id"])).map(u => `<li>${u["display name"]} (@${u.username})</li>`);
+      document.getElementById("profile-friends").innerHTML = friendNames.join("") || "<li>No friends</li>";
+
+      // Votes (if allowed)
+      if (user.sharing === "none" || (user.sharing === "friends" && !safeJSON(user.friends).includes(currentUser["user id"]))) {
+        document.getElementById("profile-votes").innerHTML = "<li>This user does not share their votes.</li>";
+        return;
+      }
+      const votes = safeJSON(user.votes);
+      const list = document.getElementById("profile-votes");
+      list.innerHTML = "";
+      votes.forEach(v => {
+        const debate = debates.find(d => d["debate id"] === v.id);
+        if (!debate) return;
+        const li = document.createElement("li");
+        li.innerHTML = `<strong>${debate.question}</strong><br/>Voted: ${v.choice} <small>${new Date(v.time).toLocaleString()}</small>`;
+        list.appendChild(li);
+      });
+    }
+
+    loadProfile();
+  </script>
+</body>
+</html>
