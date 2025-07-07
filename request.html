@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Request a Debate</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="panel">
+    <h2>Request a New Debate</h2>
+    <form id="form-request">
+      <input name="question" placeholder="Debate question" required />
+      <textarea name="description" placeholder="Optional description"></textarea>
+      <input name="options" placeholder='Options (comma-separated)' required />
+      <input name="category" placeholder="Category" required />
+      <input name="topic" placeholder="Topic" required />
+      <button>Submit Request</button>
+    </form>
+    <p><a href="index.html">Back to voting</a></p>
+  </main>
+  <script>
+    const SHEET_BASE = "https://sheets.livepolls.app/api/spreadsheets/a38d476f-d0b4-4200-b29c-1ad937b58868";
+    const REQUESTS = `${SHEET_BASE}/requests`;
+    const currentUser = JSON.parse(localStorage.getItem("stilt:user") || "null");
+    if (!currentUser) location.href = "index.html";
+
+    const j = JSON.stringify;
+    const post = (url, data) => fetch(url, {
+      method: "POST", headers: { "content-type": "application/json" }, body: j([data])
+    });
+
+    document.getElementById("form-request").onsubmit = async (e) => {
+      e.preventDefault();
+      const f = new FormData(e.target);
+      const request = {
+        "user id": currentUser["user id"],
+        question: f.get("question"),
+        description: f.get("description"),
+        options: j(f.get("options").split(",").map(x => x.trim())),
+        category: f.get("category"),
+        topic: f.get("topic"),
+        timestamp: new Date().toISOString()
+      };
+      await post(REQUESTS, request);
+      alert("Request submitted!");
+      e.target.reset();
+    };
+  </script>
+</body>
+</html>
