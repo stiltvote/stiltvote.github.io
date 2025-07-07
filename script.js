@@ -19,6 +19,13 @@ const get = async (url) => {
   return Array.isArray(json) ? json : json.data;
 };
 
+// Safe JSON utility – returns fallback if parse fails
+function safeJSON(str, fallback = []) {
+  try { return JSON.parse(str); }
+  catch { return fallback; }
+}
+
+
 
 function genId() { return Date.now().toString(36); }
 
