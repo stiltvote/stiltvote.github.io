@@ -104,13 +104,40 @@ function acceptFriend(rowId,fromUser){const friends=JSON.parse(currentUser.frien
   apiGet('users').then(users=>{const other=users.find(u=>u.username===fromUser);if(other){const otherRow=(other.__rowNum||users.indexOf(other)+2);const ofriends=JSON.parse(other.friends||'[]');ofriends.push(currentUser.username);apiPut('users',otherRow,{friends:JSON.stringify(ofriends)});}apiPut('requests',rowId,{status:'accepted'}).then(()=>route());});}
 
 /* ---------------- Activity page ---------------- */
-function switchTab(tab){const container=document.getElementById('activity-content');if(!container)return;
-  if(tab==='questions'){apiGet('debates').then(debates=>{container.innerHTML=debates.map(d=>`<div class='card'><h3>${d.question}</h3><p>${d.description||''}</p></div>`).join('');});}
-  else{Promise.all([apiGet('users'),apiGet('debates')]).then(([users,debates])=>{
-    const map=Object.fromEntries(debates.map(d=>[d['debate id'],d.question]));
-    const friends=JSON.parse(currentUser.friends||'[]');
-    const visible users=users.filter(u=>friends.includes(u.username)&&u.sharing!="Don't share votes");
-    const html=visible users.map(u=>{const votes=JSON.parse(u.votes||'[]').sort((a,b)=>(b.timestamp||0)-(a.timestamp||0));if(!votes.length)return'';return`<div class='card'><h4>${u['display name']}</h4><ul>${votes.slice(0,5).map(v=>`<li>${map[v.debateId]||v.debateId}: ${v.option}</li>`).join('')}</ul></div>`;}).filter(Boolean).join('');
-    container.innerHTML=html||'<p>No friend votes.</p>';});}}
+function switchTab(tab){
+  const container = document.getElementById('activity-content');
+  if (!container) return;
+
+  if (tab === 'questions') {
+    apiGet('debates').then(debates => {
+      container.innerHTML = debates.map(d =>
+        `<div class='card'><h3>${d.question}</h3><p>${d.description || ''}</p></div>`
+      ).join('');
+    });
+  } else {
+    Promise.all([apiGet('users'), apiGet('debates')]).then(([users, debates]) => {
+      const map = Object.fromEntries(debates.map(d => [d['debate id'], d.question]));
+      const friends = JSON.parse(currentUser.friends || '[]');
+
+      const visibleUsers = users.filter(u =>
+        friends.includes(u.username) && u.sharing !== "Don't share votes"
+      );
+
+      const html = visibleUsers.map(u => {
+        const votes = JSON.parse(u.votes || '[]').sort((a, b) =>
+          (b.timestamp || 0) - (a.timestamp || 0)
+        );
+        if (!votes.length) return '';
+        return `<div class='card'><h4>${u['display name']}</h4><ul>${
+          votes.slice(0, 5).map(v =>
+            `<li>${map[v.debateId] || v.debateId}: ${v.option}</li>`
+          ).join('')
+        }</ul></div>`;
+      }).filter(Boolean).join('');
+
+      container.innerHTML = html || '<p>No friend votes.</p>';
+    });
+  }
+}
 
 /* Ensure logout link visible? not needed here */
