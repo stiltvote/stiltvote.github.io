@@ -130,34 +130,70 @@ async function loadDebates(){
   const debates = await get(DEBATES);
   debates.forEach(d=>{
     const li=document.createElement("li");
-    li.innerHTML=`
+    li.innerHTML = `
       <strong>${d.question}</strong><br/>
-      ${d.description||""}<br/>
-      ${JSON.parse(d.options).map(o=>`
+      ${d.description || ""}<br/>
+      ${safeJSON(d.options).map(o => `
         <label><input type="radio" name="v-${d["debate id"]}" value="${o}"/>${o}</label>
       `).join(" ")}
-      <button data-id="${d["debate id"]}">Vote</button>`;
+      <button data-id="${d["debate id"]}">Vote</button>
+      <div class="results" style="margin-top:1rem;color:var(--accent)"></div>
+    `;
+    li.setAttribute("data-id", d["debate id"]);
     li.querySelector("button").onclick=voteHandler;
     list.appendChild(li);
+    showResults(d["debate id"]);
   });
 }
 
-async function voteHandler(e){
+async function voteHandler(e) {
   const debateId = e.target.dataset.id;
   const radio = document.querySelector(`input[name="v-${debateId}"]:checked`);
-  if(!radio) return alert("Pick an option");
+  if (!radio) return alert("Pick an option");
   const choice = radio.value;
-  /* update local user votes JSON */
-  const votes = JSON.parse(currentUser.votes||"[]");
-  const existing = votes.find(v=>v.id===debateId);
   const now = new Date().toISOString();
-  if(existing){ existing.choice=choice; existing.time=now; }
-  else         votes.push({id:debateId,choice,time:now});
+
+  // Update current user's votes
+  const votes = safeJSON(currentUser.votes);
+  const existing = votes.find(v => v.id === debateId);
+  if (existing) { existing.choice = choice; existing.time = now; }
+  else votes.push({ id: debateId, choice, time: now });
   currentUser.votes = j(votes);
   await put(`${USERS}/${currentUser["user id"]}`, currentUser);
-  localStorage.setItem("stilt:user",j(currentUser));
-  alert("Vote saved!");
+  localStorage.setItem("stilt:user", j(currentUser));
+
+  // Refresh live percentages
+  showResults(debateId);
 }
+
+async function showResults(debateId) {
+  const [users, debates] = await Promise.all([get(USERS), get(DEBATES)]);
+  const debate = debates.find(d => d["debate id"] === debateId);
+  if (!debate) return;
+
+  const options = safeJSON(debate.options);
+  const counts = {};
+  options.forEach(o => counts[o] = 0);
+
+  users.forEach(u => {
+    const uvotes = safeJSON(u.votes);
+    const v = uvotes.find(v => v.id === debateId);
+    if (v && counts[v.choice] !== undefined) {
+      counts[v.choice]++;
+    }
+  });
+
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  const li = document.querySelector(`li[data-id="${debateId}"]`);
+  const resultBox = li?.querySelector(".results");
+  if (!resultBox) return;
+
+  resultBox.innerHTML = options.map(opt => {
+    const pct = total ? Math.round((counts[opt] / total) * 100) : 0;
+    return `<div><strong>${opt}</strong>: ${pct}% (${counts[opt]} votes)</div>`;
+  }).join("");
+}
+
 
 /* ------------- SETTINGS ------------- */
 function saveSettings(e){
