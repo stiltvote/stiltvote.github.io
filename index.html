@@ -1,29 +1,83 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Stiltvote</title>
-  <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8" />
+  <title>StiltVote</title>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header>
-    <h1>Stiltvote</h1>
-    <nav>
-      <a href="index.html#home" id="home-link">Home</a>
-      <a href="activity.html" id="activity-link">Activity</a>
-      <a href="index.html#profile" id="profile-link">Profile</a>
-      <a href="index.html#settings" id="settings-link">Settings</a>
+    <h1>StiltVote</h1>
+    <nav id="nav-auth">
+      <button id="btn-login-view">Log in</button>
+      <button id="btn-signup-view">Sign up</button>
+    </nav>
+    <nav id="nav-user" class="hidden">
+      <span id="welcome"></span>
+      <button id="btn-settings">Settings</button>
+      <a href="activity.html">Activity</a>
+      <button id="btn-logout">Log out</button>
     </nav>
   </header>
-  <main id="app">
-    <div id="auth">
-      <h2>Login or Signup</h2>
-      <input type="text" id="username" placeholder="Username">
-      <input type="password" id="password" placeholder="Password">
-      <button onclick="loginOrSignup()">Go</button>
-    </div>
+
+  <!--‑‑‑ AUTH SCREENS ‑‑‑-->
+  <section id="screen-login" class="panel hidden">
+    <h2>Log in</h2>
+    <form id="form-login">
+      <input name="username" placeholder="username" required />
+      <input name="password" type="password" placeholder="password" required />
+      <button>Log in</button>
+    </form>
+  </section>
+
+  <section id="screen-signup" class="panel hidden">
+    <h2>Create account</h2>
+    <form id="form-signup">
+      <input name="username" placeholder="username" required />
+      <input name="display"  placeholder="display name" required />
+      <input name="password" type="password" placeholder="password" required />
+      <button>Sign up</button>
+    </form>
+  </section>
+
+  <!--‑‑‑ MAIN APP (only after login) ‑‑‑-->
+  <main id="app" class="hidden">
+    <!-- Create debate -->
+    <section class="panel">
+      <h2>New debate</h2>
+      <form id="form-debate">
+        <input name="question"  placeholder="Question"   required/>
+        <textarea name="description" placeholder="Description"></textarea>
+        <input name="options" placeholder="Comma‑separated options (yes,no)" required/>
+        <input name="category" placeholder="Category"    />
+        <input name="topic"    placeholder="Topic"       />
+        <button>Create</button>
+      </form>
+    </section>
+
+    <!-- Debates list -->
+    <section class="panel">
+      <h2>Debates</h2>
+      <ul id="debate-list"></ul>
+    </section>
   </main>
-  <script src="script.js" defer></script>
+
+  <!-- Settings modal -->
+  <dialog id="dlg-settings">
+    <form id="form-settings" method="dialog">
+      <h2>Settings</h2>
+      <label>Vote sharing
+        <select name="sharing">
+          <option value="everyone">Share with everyone</option>
+          <option value="friends">Share with friends</option>
+          <option value="none">Don’t share</option>
+        </select>
+      </label>
+      <label><input type="checkbox" name="notify" />Notify when friends vote</label>
+      <button>Save</button>
+    </form>
+  </dialog>
+
+  <script src="script.js"></script>
 </body>
 </html>
