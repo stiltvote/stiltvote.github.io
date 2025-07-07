@@ -1,28 +1,27 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Activity - Stiltvote</title>
-  <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8" />
+  <title>Activity – StiltVote</title>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header>
     <h1>Activity</h1>
-    <nav>
-      <a href="index.html#home">Home</a>
-      <a href="activity.html">Activity</a>
-      <a href="index.html#profile">Profile</a>
-      <a href="index.html#settings">Settings</a>
-    </nav>
+    <a href="index.html">← Home</a>
   </header>
-  <main>
-    <div class="tab-toggle">
-      <button onclick="switchTab('questions')">New Questions</button>
-      <button onclick="switchTab('friends')">Friends' Votes</button>
-    </div>
-    <section id="activity-content"></section>
-  </main>
-  <script src="script.js" defer></script>
+
+  <div class="toggle">
+    <button id="tab-questions" class="active">New questions</button>
+    <button id="tab-friends">Friends’ votes</button>
+  </div>
+
+  <section id="list-questions"></section>
+  <section id="list-friends" class="hidden"></section>
+
+  <script src="script.js"></script>
+  <script>
+    initActivity();      /* lives in script.js */
+  </script>
 </body>
 </html>
